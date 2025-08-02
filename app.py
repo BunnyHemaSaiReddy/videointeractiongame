@@ -134,6 +134,7 @@ def handle_ice_candidate(data):
 @socketio.on('ready')
 def handle_ready(room):
     emit('ready', room=room, include_self=False)
-
+import os
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=3430, debug=True)
+    port = int(os.environ.get("PORT", 3430))  # 5000 for local, Render gives PORT env variable
+    socketio.run(app, host='0.0.0.0', port=port)
