@@ -80,7 +80,7 @@
   </div>
 
     <script>
-        const socket = io('http://0.0.0.0:3430');
+        const socket = io(`${window.location.protocol}//${window.location.host}`);
         let roomId = null;
         let symbol = null;
         let currentTurn = null;
