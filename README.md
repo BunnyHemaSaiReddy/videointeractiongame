@@ -33,8 +33,8 @@ Built with a combination of **Flask**, **WebSockets**, and **WebRTC**, this app 
 ├── app.py # Flask server with WebSocket handling<br>
 ├── templates/<br>
 │ └── index.html # Main HTML interface<br>
-├── static/
-│ └── style.css # Styling for the app
-├── requirements.txt # Python dependencies
-└── README.md # Project documentation
+├── static/<br>
+│ └── style.css # Styling for the app<br>
+├── requirements.txt # Python dependencies<br>
+└── README.md # Project documentation<br>
 
