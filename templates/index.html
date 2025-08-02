@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Matchmaking Game</title>
+    <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+
+    <style>
+        #gameBoard {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-gap: 5px;
+            margin: 10px 0;
+        }
+        .cell {
+            width: 100px;
+            height: 100px;
+            font-size: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: white;
+            border: 2px solid #333;
+            cursor: pointer;
+            user-select: none;
+        }
+        .cell.disabled {
+            cursor: default;
+            background-color: #eee;
+        }
+        #chatbox p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <h style="text-align:center; color:#03dac6; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin-bottom:25px; font-size:28px;align:center;">
+  🐰 Bunny: A Real-time Gaming & Chat Experience 
+</h>
+
+  <h2 id="status">Connecting to server...</h2>
+
+  <div id="game" style="display:none;">
+    <p><strong>You are connected to:</strong> <span id="opponent"></span></p>
+    <p><strong id="turnStatus"></strong></p>
+
+    <!-- Wrap Chat and Game in one flex container -->
+    <div id="mainContent">
+      <!-- Chat section -->
+      <div id="chatContainer">
+        <h3>Chat</h3>
+        <div id="chatbox" style="border:1px solid #000; height:150px; overflow:auto; padding:5px;"></div>
+        <input id="chatInput" placeholder="Type a message..." />
+        <button onclick="sendChat()">Send</button>
+      </div>
+
+      <!-- Game section -->
+      <div id="gameContainer">
+        <div id="gameStatus"></div>
+        <div id="gameBoard">
+          <div class="cell" id="cell0"></div>
+          <div class="cell" id="cell1"></div>
+          <div class="cell" id="cell2"></div>
+          <div class="cell" id="cell3"></div>
+          <div class="cell" id="cell4"></div>
+          <div class="cell" id="cell5"></div>
+          <div class="cell" id="cell6"></div>
+          <div class="cell" id="cell7"></div>
+          <div class="cell" id="cell8"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Video Chat below main content -->
+    <div id="videoChat">
+      <h3>Video Chat</h3>
+      <video id="localVideo" autoplay muted playsinline width="200"></video>
+      <video id="remoteVideo" autoplay playsinline width="200"></video>
+    </div>
+  </div>
+
+    <script>
+        const socket = io('http://0.0.0.1:3430');
+        let roomId = null;
+        let symbol = null;
+        let currentTurn = null;
+        let peerConnection;
+        const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const turnStatus = document.getElementById('turnStatus');
+        const gameBoard = document.getElementById('gameBoard');
+        const gameStatus = document.getElementById('gameStatus');
+
+        const boardState = Array(9).fill('');
+
+        socket.on('connect', () => {
+            document.getElementById('status').textContent = 'Waiting for a player...';
+        });
+
+        socket.on('match_found', async (data) => {
+            roomId = data.room;
+            symbol = data.symbol;
+            currentTurn = data.starter;
+
+            document.getElementById('status').style.display = 'none';
+            document.getElementById('game').style.display = 'block';
+            document.getElementById('opponent').textContent = data.opponent;
+
+            resetBoard();
+            updateTurnStatus();
+
+            const stream = await startMedia();
+            createPeer(stream);
+            socket.emit('ready', roomId);
+        });
+
+        function updateTurnStatus() {
+            if (currentTurn === socket.id) {
+                turnStatus.textContent = "Your turn";
+                enableBoard(true);
+            } else {
+                turnStatus.textContent = "Opponent's turn";
+                enableBoard(false);
+            }
+        }
+
+        function resetBoard() {
+            for (let i = 0; i < 9; i++) {
+                boardState[i] = '';
+                const cell = document.getElementById(`cell${i}`);
+                cell.textContent = '';
+                cell.classList.remove('disabled');
+            }
+            gameStatus.textContent = '';
+        }
+
+        function enableBoard(enable) {
+            for (let i = 0; i < 9; i++) {
+                const cell = document.getElementById(`cell${i}`);
+                if (boardState[i] !== '') {
+                    cell.classList.add('disabled');
+                    continue;
+                }
+                if (enable) {
+                    cell.classList.remove('disabled');
+                } else {
+                    cell.classList.add('disabled');
+                }
+            }
+        }
+
+        socket.on('game_move', (data) => {
+            const { index, symbol: moveSymbol, nextTurn } = data;
+            boardState[index] = moveSymbol;
+            const cell = document.getElementById('cell' + index);
+            cell.textContent = moveSymbol;
+            currentTurn = nextTurn;
+
+            // Check for game end after opponent's move
+            const result = checkGameEnd(moveSymbol);
+            if (result) {
+                gameStatus.textContent = result;
+                enableBoard(false);
+                return;
+            }
+
+            updateTurnStatus();
+        });
+
+        // Setup click handlers for each cell once
+        document.querySelectorAll('.cell').forEach((cell, index) => {
+            cell.addEventListener('click', () => {
+                if (currentTurn !== socket.id || boardState[index] !== '') return;
+
+                // Mark move locally
+                boardState[index] = symbol;
+                cell.textContent = symbol;
+
+                // Check for win/draw locally first
+                const result = checkGameEnd(symbol);
+                if (result) {
+                    gameStatus.textContent = result;
+                    enableBoard(false);
+                }
+
+                // Emit move without nextTurn (server controls turn)
+                socket.emit('game_move', {
+                    room: roomId,
+                    index,
+                    symbol,
+                    sender: socket.id
+                });
+
+                if (!result) {
+                    // Switch turn locally for immediate UI feedback, will be confirmed by server's nextTurn
+                    currentTurn = null;
+                    updateTurnStatus();
+                }
+            });
+        });
+
+        function checkGameEnd(playerSymbol) {
+            const winPatterns = [
+                [0,1,2], [3,4,5], [6,7,8],
+                [0,3,6], [1,4,7], [2,5,8],
+                [0,4,8], [2,4,6]
+            ];
+
+            for (const pattern of winPatterns) {
+                const [a,b,c] = pattern;
+                if (boardState[a] === playerSymbol &&
+                    boardState[b] === playerSymbol &&
+                    boardState[c] === playerSymbol) {
+                    return `Player ${playerSymbol} wins!`;
+                }
+            }
+
+            if (boardState.every(cell => cell !== '')) {
+                return 'Draw!';
+            }
+
+            return null;
+        }
+
+        socket.on('chat_message', (data) => {
+            const chatbox = document.getElementById('chatbox');
+            const p = document.createElement('p');
+            p.textContent = data.sender + ': ' + data.message;
+            chatbox.appendChild(p);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        });
+
+        socket.on('opponent_disconnected', () => {
+            alert('Opponent disconnected!');
+            location.reload();
+        });
+
+        function sendChat() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (message) {
+                socket.emit('chat_message', { room: roomId, message, sender: socket.id });
+                input.value = '';
+            }
+        }
+
+        // WebRTC Section
+        async function startMedia() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                localVideo.srcObject = stream;
+                return stream;
+            } catch (e) {
+                alert("⚠️ Please allow camera and microphone access.");
+                return null;
+            }
+        }
+
+        function createPeer(stream) {
+            if (!stream) return;
+
+            peerConnection = new RTCPeerConnection(config);
+
+            stream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, stream);
+            });
+
+            peerConnection.ontrack = (e) => {
+                remoteVideo.srcObject = e.streams[0];
+            };
+
+            peerConnection.onicecandidate = (e) => {
+                if (e.candidate) {
+                    socket.emit('ice-candidate', { room: roomId, candidate: e.candidate });
+                }
+            };
+        }
+
+        socket.on('ready', async () => {
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            socket.emit('offer', { room: roomId, offer });
+        });
+
+        socket.on('offer', async (offer) => {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            socket.emit('answer', { room: roomId, answer });
+        });
+
+        socket.on('answer', async (answer) => {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+        });
+
+        socket.on('ice-candidate', async (candidate) => {
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (err) {
+                console.error('Error adding ICE candidate:', err);
+            }
+        });
+    </script>
+</body>
+</html>
