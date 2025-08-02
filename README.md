@@ -1,2 +1,40 @@
-# videointeractiongame
-Bunny is a real-time multiplayer web application developed by Hemasai Reddy that combines the fun of a classic Tic-Tac-Toe game with the functionality of live video calling and instant messaging.
+# 🐰 Bunny: A Real-time Gaming & Chat Experience 
+
+Welcome to **Bunny**, a real-time web application that allows two users to:
+- Play a classic **Tic-Tac-Toe** game
+- **Video call** each other via WebRTC
+- **Chat** using real-time messaging
+
+Built with a combination of **Flask**, **WebSockets**, and **WebRTC**, this app demonstrates interactive full-stack development with live video and multiplayer features.
+
+---
+
+## 🚀 Features
+
+- 🎮 **Multiplayer Tic-Tac-Toe**: Real-time updates between two players.
+- 📹 **Live Video Chat**: Direct peer-to-peer video communication using WebRTC.
+- 💬 **Real-time Messaging**: In-app chat with instant message delivery.
+- 🎨 **Responsive UI**: Styled with CSS Flexbox, optimized for desktops.
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer        | Technology           |
+|--------------|----------------------|
+| Backend      | Flask, Flask-SocketIO |
+| Frontend     | HTML, CSS, JavaScript |
+| Real-time    | WebSockets, WebRTC   |
+| Styling      | Custom CSS (Flexbox) |
+
+---
+
+## 📂 Project Structure
+├── app.py # Flask server with WebSocket handling
+├── templates/
+│ └── index.html # Main HTML interface
+├── static/
+│ └── style.css # Styling for the app
+├── requirements.txt # Python dependencies
+└── README.md # Project documentation
+
