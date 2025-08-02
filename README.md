@@ -30,9 +30,9 @@ Built with a combination of **Flask**, **WebSockets**, and **WebRTC**, this app 
 ---
 
 ## 📂 Project Structure
-├── app.py # Flask server with WebSocket handling
-├── templates/
-│ └── index.html # Main HTML interface
+├── app.py # Flask server with WebSocket handling<br>
+├── templates/<br>
+│ └── index.html # Main HTML interface<br>
 ├── static/
 │ └── style.css # Styling for the app
 ├── requirements.txt # Python dependencies
